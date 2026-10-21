@@ -1,0 +1,80 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>LAST LIGHT: WWII Survival</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#18251b;color:#eee9d8;font:14px system-ui;overflow:hidden}canvas{display:block;width:100vw;height:100dvh;touch-action:none}#hud{position:absolute;inset:0;pointer-events:none;padding:10px;display:flex;flex-direction:column;justify-content:space-between}.top,.bottom{display:flex;justify-content:space-between;gap:7px;align-items:flex-start}.panel{background:#101811e8;border:1px solid #78836a;border-radius:8px;padding:9px}.bottom{align-items:end}button{pointer-events:auto;background:#344331;color:white;border:1px solid #8b9876;border-radius:8px;padding:10px 8px;font-weight:bold}#pad{display:grid;grid-template-columns:repeat(3,42px);gap:4px}#pad button{height:40px;padding:0;font-size:18px}#actions{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}#start{position:absolute;inset:0;background:#0a100eeF;display:grid;place-items:center;padding:24px}#card{max-width:430px;background:#243126;border:1px solid #9b9b76;border-radius:15px;padding:22px}h1{font-size:42px;line-height:.9;color:#dfc47c}#start p{line-height:1.5}#toast{position:absolute;top:40%;left:10%;right:10%;text-align:center;font-weight:bold;text-shadow:0 2px 4px #000;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div class="top">
+  <div class="panel"><b style="color:#dfc47c">LAST LIGHT</b><br>FRANCE · 1944<br><span id="day">DAY 1</span></div>
+  <div class="panel" id="stats">HEALTH 100<br>FOOD 100<br>WARMTH 100</div>
+  <div class="panel" id="resources">WOOD 0<br>SCRAP 0<br>RATIONS 2</div>
+ </div>
+ <div class="bottom">
+  <div id="pad">
+   <span></span><button data-d="up">▲</button><span></span>
+   <button data-d="left">◀</button><button data-d="down">▼</button><button data-d="right">▶</button>
+  </div>
+  <div class="panel" id="message">Find supplies and survive.</div>
+  <div id="actions">
+   <button id="scavenge">SCAVENGE</button><button id="eat">EAT</button>
+   <button id="build">BUILD SHELTER</button><button id="rest">REST</button>
+  </div>
+ </div>
+</div>
+<div id="toast"></div>
+<div id="start"><div id="card">
+ <div>WWII COUNTRYSIDE SURVIVAL</div><h1>LAST<br>LIGHT</h1>
+ <p><b>France, 1944.</b> Your unit has scattered after an ambush. Search the ruined countryside, find supplies, keep warm and survive the night.</p>
+ <p>Move with the arrows. Scavenge near trees, ruins and supply crates. Collect 5 wood and 3 scrap to build a shelter.</p>
+ <button id="begin">BEGIN SURVIVAL</button>
+</div></div>
+<script>
+(()=>{
+const c=document.querySelector('#game'),x=c.getContext('2d');
+let W,H,camX=0,camY=0,started=false,day=1,hp=100,food=100,warm=100,wood=0,scrap=0,rations=2,shelter=false,ticks=0;
+const world={w:2400,h:1800},p={x:1200,y:900};
+let objects=[],patrols=[],dirs={};
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight;draw()}
+addEventListener('resize',resize);
+function rand(a,b){return a+Math.random()*(b-a)}
+function seed(){objects=[];patrols=[];for(let i=0;i<170;i++)objects.push({x:rand(30,2370),y:rand(30,1770),type:['tree','tree','tree','rock','crate','ruin'][Math.floor(Math.random()*6)],used:false});for(let i=0;i<6;i++)patrols.push({x:rand(100,2300),y:rand(100,1700),a:rand(0,6)})}
+function say(s){document.querySelector('#toast').textContent=s;setTimeout(()=>{document.querySelector('#toast').textContent=''},1800)}
+function updateUI(){document.querySelector('#stats').innerHTML=`HEALTH ${Math.max(0,hp)}<br>FOOD ${Math.max(0,food)}<br>WARMTH ${Math.max(0,warm)}`;document.querySelector('#resources').innerHTML=`WOOD ${wood}<br>SCRAP ${scrap}<br>RATIONS ${rations}`;document.querySelector('#day').textContent='DAY '+day}
+function move(d){if(!started||hp<=0)return;let s=15;if(d==='up')p.y-=s;if(d==='down')p.y+=s;if(d==='left')p.x-=s;if(d==='right')p.x+=s;p.x=Math.max(12,Math.min(world.w-12,p.x));p.y=Math.max(12,Math.min(world.h-12,p.y));draw()}
+document.querySelectorAll('[data-d]').forEach(b=>{let d=b.dataset.d;b.addEventListener('pointerdown',e=>{e.preventDefault();dirs[d]=setInterval(()=>move(d),90)});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>{clearInterval(dirs[d]);dirs[d]=null}))});
+addEventListener('keydown',e=>{let d={ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right'}[e.key];if(d)move(d)});
+function nearby(){return objects.filter(o=>!o.used&&Math.hypot(o.x-p.x,o.y-p.y)<100)}
+document.querySelector('#scavenge').onclick=()=>{if(!started)return;let a=nearby();if(!a.length){say('Move closer to a tree, ruin or crate.');return}let o=a[0];o.used=true;if(o.type==='tree'){wood+=1+Math.floor(Math.random()*2);say('Collected firewood.')}else if(o.type==='crate'){scrap+=2;rations++;say('Found a supply crate!')}else if(o.type==='ruin'){scrap+=2;wood++;say('Searched ruined farm buildings.')}else{wood++;say('Collected useful materials.')}updateUI();draw()};
+document.querySelector('#eat').onclick=()=>{if(rations>0){rations--;food=Math.min(100,food+35);say('You eat a ration.')}else say('No rations left.');updateUI()};
+document.querySelector('#build').onclick=()=>{if(shelter){say('Your shelter is already built.');return}if(wood>=5&&scrap>=3){wood-=5;scrap-=3;shelter=true;warm=Math.min(100,warm+25);say('Shelter built. You may survive the night.')}else say('Need 5 wood and 3 scrap.');updateUI();draw()};
+document.querySelector('#rest').onclick=()=>{if(shelter){hp=Math.min(100,hp+12);warm=Math.min(100,warm+18);say('Resting in shelter.')}else{warm=Math.max(0,warm-4);say('Too exposed to rest safely.')}updateUI()};
+document.querySelector('#begin').onclick=()=>{started=true;document.querySelector('#start').style.display='none';say('Find supplies. Watch for patrols.');draw()};
+function draw(){
+ if(!W||!H)return;camX=Math.max(0,Math.min(world.w-W,p.x-W/2));camY=Math.max(0,Math.min(world.h-H,p.y-H/2));
+ x.fillStyle='#293c2b';x.fillRect(0,0,W,H);
+ for(let i=0;i<180;i++){let gx=(i*137)%world.w,gy=(i*89)%world.h,sx=gx-camX,sy=gy-camY;if(sx>-10&&sy>-10&&sx<W&&sy<H){x.fillStyle=i%3?'#354a31':'#405039';x.fillRect(sx,sy,4,4)}}
+ for(const o of objects){let sx=o.x-camX,sy=o.y-camY;if(sx< -40||sy< -40||sx>W+40||sy>H+40)continue;x.globalAlpha=o.used?.25:1;
+ if(o.type==='tree'){x.fillStyle='#172b1c';x.beginPath();x.arc(sx,sy,20,0,7);x.fill();x.fillStyle='#46613a';x.beginPath();x.arc(sx-4,sy-5,14,0,7);x.fill()}
+ else if(o.type==='rock'){x.fillStyle='#8b8973';x.fillRect(sx-7,sy-5,14,10)}
+ else if(o.type==='crate'){x.fillStyle='#aa8650';x.fillRect(sx-9,sy-8,18,16);x.strokeStyle='#403522';x.strokeRect(sx-9,sy-8,18,16)}
+ else{x.fillStyle='#665f4b';x.fillRect(sx-19,sy-14,38,28);x.fillStyle='#30392e';x.fillRect(sx-9,sy-5,13,10)}
+ }x.globalAlpha=1;
+ for(const q of patrols){q.a+=.008;q.x+=Math.cos(q.a)*.5;q.y+=Math.sin(q.a)*.5;let sx=q.x-camX,sy=q.y-camY;if(sx>0&&sy>0&&sx<W&&sy<H){x.fillStyle='#252b2a';x.fillRect(sx-7,sy-9,14,18);if(Math.hypot(q.x-p.x,q.y-p.y)<45){hp=Math.max(0,hp-.04);say('Enemy patrol nearby!');}}}
+ if(shelter){x.fillStyle='#7e704f';x.fillRect(p.x-camX+20,p.y-camY-5,30,25)}
+ x.fillStyle='#d7d0b6';x.fillRect(p.x-camX-6,p.y-camY-9,12,18);x.fillStyle='#4a5b42';x.fillRect(p.x-camX-5,p.y-camY-3,10,9);
+ x.strokeStyle='#d9c78e';x.beginPath();x.arc(p.x-camX,p.y-camY,17,0,7);x.stroke();
+ if(started&&++ticks%90===0){food=Math.max(0,food-1);warm=Math.max(0,warm-(shelter?0:1));if(food===0||warm===0)hp=Math.max(0,hp-2);if(ticks%900===0){day++;say('Night passes. Day '+day)}updateUI();if(hp===0){started=false;document.querySelector('#start').style.display='grid';document.querySelector('#card').innerHTML='<h1>YOU FELL</h1><p>Your survival ended on Day '+day+'. Try again, soldier.</p><button onclick="location.reload()">TRY AGAIN</button>'}}
+}
+seed();resize();setInterval(draw,70);updateUI();
+})();
+</script>
+</body>
+</html>
